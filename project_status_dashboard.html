@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Status Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f4f6fb;color:#222;min-height:100vh}
+.dash{padding:1.5rem 1.25rem;max-width:1100px;margin:0 auto}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:8px}
+.topbar h1{font-size:20px;font-weight:600;color:#1F3864;display:flex;align-items:center;gap:8px}
+.topbar span{font-size:12px;color:#888}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.5rem}
+.kpi{background:#fff;border-radius:10px;padding:14px 16px;border:0.5px solid #e0e0e0}
+.kpi-label{font-size:11px;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.kpi-value{font-size:26px;font-weight:600;color:#1F3864}
+.kpi-sub{font-size:11px;color:#aaa;margin-top:2px}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.5rem}
+.chart-card{background:#fff;border:0.5px solid #e0e0e0;border-radius:12px;padding:1rem}
+.chart-title{font-size:13px;font-weight:600;color:#555;margin-bottom:10px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;font-size:11px;color:#666}
+.legend span{display:flex;align-items:center;gap:4px}
+.legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.filters{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+.filters select,.filters input{font-size:13px;padding:5px 10px;height:34px;border-radius:8px;background:#f4f6fb;color:#222;border:0.5px solid #ccc;outline:none}
+.filters input{width:190px}
+.table-wrap{overflow-x:auto;border:0.5px solid #e0e0e0;border-radius:12px;background:#fff}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{background:#f4f6fb;color:#888;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:10px 12px;text-align:left;border-bottom:0.5px solid #e0e0e0;white-space:nowrap}
+td{padding:10px 12px;border-bottom:0.5px solid #f0f0f0;color:#222;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f9fbff}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.s-completed{background:#C6EFCE;color:#276221}
+.s-inprogress{background:#BDD7EE;color:#1F3864}
+.s-onhold{background:#FFEB9C;color:#7D5000}
+.s-atrisk{background:#FFC7CE;color:#9C0006}
+.s-notstarted{background:#E8E8E8;color:#595959}
+.progress-wrap{width:100%;background:#eef2f7;border-radius:20px;height:6px;overflow:hidden}
+.progress-bar{height:6px;border-radius:20px}
+.priority-high{color:#9C0006;font-weight:600}
+.priority-med{color:#7D5000}
+.priority-low{color:#888}
+#rowCount{font-size:12px;color:#aaa;margin-top:8px;text-align:right}
+@media(max-width:600px){.charts-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="dash">
+  <div class="topbar">
+    <h1><i class="ti ti-chart-bar"></i> Project Status Dashboard</h1>
+    <span id="lastUpdated"></span>
+  </div>
+
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Status breakdown</div>
+      <div class="legend" id="pieLegend"></div>
+      <div style="position:relative;height:200px"><canvas id="pieChart" role="img" aria-label="Pie chart showing project status distribution"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Budget vs spent by department (₹L)</div>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:#378ADD"></span>Budget</span>
+        <span><span class="legend-dot" style="background:#ED7D31"></span>Spent</span>
+      </div>
+      <div style="position:relative;height:200px"><canvas id="barChart" role="img" aria-label="Bar chart comparing budget and spent by department"></canvas></div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="search" placeholder="Search projects…" oninput="render()">
+    <select id="statusFilter" onchange="render()">
+      <option value="">All statuses</option>
+      <option>Completed</option>
+      <option>In Progress</option>
+      <option>On Hold</option>
+      <option>At Risk</option>
+      <option>Not Started</option>
+    </select>
+    <select id="deptFilter" onchange="render()">
+      <option value="">All departments</option>
+      <option>IT</option>
+      <option>Academics</option>
+      <option>Content</option>
+      <option>Operations</option>
+      <option>HR</option>
+    </select>
+    <select id="priorityFilter" onchange="render()">
+      <option value="">All priorities</option>
+      <option>High</option>
+      <option>Medium</option>
+      <option>Low</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:52px">ID</th>
+          <th style="width:auto">Project</th>
+          <th style="width:110px">Owner</th>
+          <th style="width:90px">Dept</th>
+          <th style="width:100px">Status</th>
+          <th style="width:70px">Priority</th>
+          <th style="width:120px">Progress</th>
+          <th style="width:80px">Budget</th>
+          <th style="width:70px">Spent</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="rowCount"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const projects = [
+  {id:"P001",name:"Student Portal Upgrade",owner:"Ravi Kumar",dept:"IT",start:"15-Jan-26",end:"30-Jun-26",status:"Completed",pct:100,budget:12.5,spent:12.1,priority:"High",notes:"Deployed to production"},
+  {id:"P002",name:"JEE Mock Test Platform",owner:"Priya Singh",dept:"Academics",start:"01-Feb-26",end:"31-Aug-26",status:"In Progress",pct:65,budget:8.0,spent:5.2,priority:"High",notes:"UI review pending"},
+  {id:"P003",name:"NEET Study Material Refresh",owner:"Amit Verma",dept:"Content",start:"10-Mar-26",end:"15-Jul-26",status:"In Progress",pct:40,budget:5.5,spent:2.2,priority:"Medium",notes:"Writer assigned"},
+  {id:"P004",name:"RRB Data Analytics Dashboard",owner:"Sunita Rao",dept:"IT",start:"05-Jan-26",end:"31-May-26",status:"At Risk",pct:55,budget:6.0,spent:4.8,priority:"High",notes:"API delay"},
+  {id:"P005",name:"SSC CGL Batch Planning",owner:"Deepak Joshi",dept:"Operations",start:"01-Apr-26",end:"30-Sep-26",status:"Not Started",pct:0,budget:3.0,spent:0,priority:"Low",notes:"Awaiting approvals"},
+  {id:"P006",name:"CUET Coaching Expansion",owner:"Neha Gupta",dept:"Academics",start:"20-Feb-26",end:"31-Oct-26",status:"In Progress",pct:30,budget:15.0,spent:4.5,priority:"High",notes:"3 new centres"},
+  {id:"P007",name:"ERP Integration",owner:"Vikram Nair",dept:"IT",start:"01-Nov-25",end:"30-Apr-26",status:"On Hold",pct:70,budget:20.0,spent:14.0,priority:"Medium",notes:"Vendor issue"},
+  {id:"P008",name:"SATHEE Baseline Assessment",owner:"Anjali Mehta",dept:"Academics",start:"01-Mar-26",end:"15-Jun-26",status:"Completed",pct:100,budget:4.0,spent:3.9,priority:"High",notes:"1200 students assessed"},
+  {id:"P009",name:"Faculty Training Programme",owner:"Rahul Das",dept:"HR",start:"01-May-26",end:"31-Jul-26",status:"In Progress",pct:20,budget:2.5,spent:0.5,priority:"Medium",notes:"Module 1 done"},
+  {id:"P010",name:"Mobile App Development",owner:"Kavita Sharma",dept:"IT",start:"15-Apr-26",end:"31-Dec-26",status:"Not Started",pct:0,budget:18.0,spent:0,priority:"High",notes:"RFP issued"},
+];
+
+const statusClass={
+  "Completed":"s-completed","In Progress":"s-inprogress",
+  "On Hold":"s-onhold","At Risk":"s-atrisk","Not Started":"s-notstarted"
+};
+const statusColors=["#276221","#1F3864","#9C5700","#9C0006","#888780"];
+const statusKeys=["Completed","In Progress","On Hold","At Risk","Not Started"];
+
+function buildKPIs(){
+  const total=projects.length;
+  const comp=projects.filter(p=>p.status==="Completed").length;
+  const risk=projects.filter(p=>p.status==="At Risk").length;
+  const totalBudget=projects.reduce((a,p)=>a+p.budget,0);
+  const totalSpent=projects.reduce((a,p)=>a+p.spent,0);
+  const utilPct=Math.round(totalSpent/totalBudget*100);
+  return [
+    {label:"Total projects",value:total,sub:"across all departments"},
+    {label:"Completed",value:comp,sub:Math.round(comp/total*100)+"% of total"},
+    {label:"In progress",value:projects.filter(p=>p.status==="In Progress").length,sub:"active now"},
+    {label:"At risk",value:risk,sub:"need attention"},
+    {label:"Total budget",value:"₹"+totalBudget.toFixed(1)+"L",sub:"allocated"},
+    {label:"Budget utilised",value:utilPct+"%",sub:"₹"+totalSpent.toFixed(1)+"L spent"},
+  ];
+}
+
+document.getElementById("kpiGrid").innerHTML=buildKPIs().map(k=>`
+  <div class="kpi">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-value">${k.value}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join("");
+
+document.getElementById("lastUpdated").textContent="Updated: "+new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+
+function render(){
+  const q=document.getElementById("search").value.toLowerCase();
+  const sf=document.getElementById("statusFilter").value;
+  const df=document.getElementById("deptFilter").value;
+  const pf=document.getElementById("priorityFilter").value;
+  const filtered=projects.filter(p=>{
+    if(sf&&p.status!==sf)return false;
+    if(df&&p.dept!==df)return false;
+    if(pf&&p.priority!==pf)return false;
+    if(q&&!p.name.toLowerCase().includes(q)&&!p.owner.toLowerCase().includes(q)&&!p.id.toLowerCase().includes(q))return false;
+    return true;
+  });
+  document.getElementById("tbody").innerHTML=filtered.map(p=>`
+    <tr>
+      <td style="color:#999;font-size:12px">${p.id}</td>
+      <td style="font-weight:600">${p.name}<br><span style="font-size:11px;color:#aaa;font-weight:400">${p.start} → ${p.end}</span></td>
+      <td style="color:#666">${p.owner}</td>
+      <td style="color:#666">${p.dept}</td>
+      <td><span class="badge ${statusClass[p.status]}">${p.status}</span></td>
+      <td class="${p.priority==="High"?"priority-high":p.priority==="Medium"?"priority-med":"priority-low"}">${p.priority}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="progress-wrap" style="flex:1">
+            <div class="progress-bar" style="width:${p.pct}%;background:${p.status==="At Risk"?"#E24B4A":p.status==="Completed"?"#639922":"#378ADD"}"></div>
+          </div>
+          <span style="font-size:12px;color:#aaa;min-width:30px;text-align:right">${p.pct}%</span>
+        </div>
+      </td>
+      <td style="text-align:right">₹${p.budget.toFixed(1)}L</td>
+      <td style="text-align:right;color:${p.spent>p.budget?"#E24B4A":"#222"}">₹${p.spent.toFixed(1)}L</td>
+    </tr>`).join("");
+  document.getElementById("rowCount").textContent="Showing "+filtered.length+" of "+projects.length+" projects";
+}
+render();
+
+const statusCounts=statusKeys.map(s=>projects.filter(p=>p.status===s).length);
+document.getElementById("pieLegend").innerHTML=statusKeys.map((s,i)=>`
+  <span><span class="legend-dot" style="background:${statusColors[i]}"></span>${s} (${statusCounts[i]})</span>`).join("");
+
+new Chart(document.getElementById("pieChart"),{
+  type:"doughnut",
+  data:{labels:statusKeys,datasets:[{data:statusCounts,backgroundColor:statusColors,borderWidth:2,borderColor:"#fff"}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>" "+ctx.label+": "+ctx.raw+" projects"}}}}
+});
+
+const depts=["IT","Academics","Content","Operations","HR"];
+const budgets=depts.map(d=>+projects.filter(p=>p.dept===d).reduce((a,p)=>a+p.budget,0).toFixed(1));
+const spents=depts.map(d=>+projects.filter(p=>p.dept===d).reduce((a,p)=>a+p.spent,0).toFixed(1));
+
+new Chart(document.getElementById("barChart"),{
+  type:"bar",
+  data:{labels:depts,datasets:[
+    {label:"Budget",data:budgets,backgroundColor:"#378ADD",borderRadius:3},
+    {label:"Spent",data:spents,backgroundColor:"#ED7D31",borderRadius:3}
+  ]},
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{font:{size:11}},grid:{display:false}},
+      y:{ticks:{font:{size:11},callback:v=>"₹"+v+"L"},grid:{color:"rgba(0,0,0,0.06)"}}
+    }
+  }
+});
+</script>
+</body>
+</html>
